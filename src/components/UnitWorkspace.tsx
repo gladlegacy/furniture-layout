@@ -3,13 +3,20 @@ import type { InventoryEntry } from '../inventory.ts'
 import { addInventory } from '../inventory.ts'
 import {
   DEFAULT_PROGRAM,
+  attachToWall,
+  blankJoinPlan,
+  doorWidth,
   generateUnitPlans,
+  linkDoorWidth,
+  planBounds,
+  shiftToOrigin,
   sceneFromEnvelope,
   sceneFromUnitRoom,
   type UnitOpening,
   type UnitPlan,
   type UnitProgram,
   type UnitRoom,
+  type UnitRoomKind,
 } from '../layout/unitPlan.ts'
 import type { Scene, Wall } from '../types.ts'
 import { uid, WALLS, WALL_LABEL } from '../types.ts'
@@ -41,6 +48,35 @@ function programKey(program: UnitProgram): string {
   return JSON.stringify(program)
 }
 
+const JOIN_KINDS: { kind: UnitRoomKind; label: string; along: number; depth: number }[] = [
+  { kind: 'corridor', label: '복도', along: 240, depth: 120 },
+  { kind: 'bedroom', label: '방', along: 280, depth: 320 },
+  { kind: 'bathroom', label: '화장실', along: 180, depth: 200 },
+  { kind: 'living', label: '거실', along: 420, depth: 360 },
+  { kind: 'kitchen', label: '주방', along: 260, depth: 220 },
+]
+
+function attachNear(
+  rooms: UnitRoom[],
+  hostId: string,
+  wall: Wall,
+  at: number,
+  along: number,
+  depth: number,
+  kind: UnitRoomKind,
+) {
+  const desired = Math.round(at - along / 2)
+  const direct = attachToWall(rooms, hostId, wall, desired, along, depth, kind)
+  if (direct) return direct
+  for (let step = 5; step <= 30; step += 5) {
+    const lower = attachToWall(rooms, hostId, wall, desired - step, along, depth, kind)
+    if (lower) return lower
+    const upper = attachToWall(rooms, hostId, wall, desired + step, along, depth, kind)
+    if (upper) return upper
+  }
+  return null
+}
+
 export function UnitWorkspace({
   entries,
   onEntries,
@@ -57,11 +93,16 @@ export function UnitWorkspace({
   const [picked, setPicked] = useState(0)
   const [angleKey, setAngleKey] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [joinKind, setJoinKind] = useState<UnitRoomKind | null>(null)
+  const [joinAlong, setJoinAlong] = useState(240)
+  const [joinDepth, setJoinDepth] = useState(120)
+  const [joinMessage, setJoinMessage] = useState<string | null>(null)
   const generated = useMemo(() => generateUnitPlans(program), [program])
   const result = pinned ? { plans: pinned, message: '' } : generated
   const base = result.plans[picked] ?? result.plans[0] ?? null
   const active = base ? (edits[base.id] ?? base) : null
   const selected = active?.rooms.find((room) => room.id === selectedId) ?? null
+  const bounds = active ? planBounds(active.rooms) : { width: program.width, depth: program.depth }
   const dirty = programKey(draft) !== programKey(program)
   const saved = entries.filter((entry) => entry.kind === 'unit')
 
@@ -84,7 +125,7 @@ export function UnitWorkspace({
   const patchDoor = (room: UnitRoom, next: Partial<UnitOpening>) => {
     if (!room.door) return room
     const wall = next.wall ?? room.door.wall
-    const fitted = fitOpening(wallSpan(room, wall), next.offset ?? room.door.offset, next.width ?? room.door.width, 70)
+    const fitted = fitOpening(wallSpan(room, wall), next.offset ?? room.door.offset, next.width ?? room.door.width, doorWidth(room.kind))
     return { ...room, door: { ...room.door, wall, ...fitted } }
   }
 
@@ -98,6 +139,42 @@ export function UnitWorkspace({
   const openSelected = () => {
     if (!selected || selected.kind === 'corridor') return
     onOpenRoom(sceneFromUnitRoom(selected))
+  }
+
+  const chooseJoin = (kind: UnitRoomKind) => {
+    const preset = JOIN_KINDS.find((item) => item.kind === kind)
+    setJoinKind((current) => (current === kind ? null : kind))
+    if (preset && joinKind !== kind) {
+      setJoinAlong(preset.along)
+      setJoinDepth(preset.depth)
+    }
+    setJoinMessage(null)
+  }
+
+  const startBlank = () => {
+    const plan = blankJoinPlan()
+    setPinned([plan])
+    setEdits({})
+    setPicked(0)
+    setSelectedId('entrance')
+    setJoinKind('corridor')
+    setJoinAlong(240)
+    setJoinDepth(120)
+    setJoinMessage(null)
+  }
+
+  const joinOnWall = (roomId: string, wall: Wall, at: number) => {
+    if (!active || !joinKind) return
+    const joined = attachNear(active.rooms, roomId, wall, at, joinAlong, joinDepth, joinKind)
+    if (!joined) {
+      const host = active.rooms.find((room) => room.id === roomId)
+      const need = host ? linkDoorWidth(joinKind, host.kind) : 90
+      setJoinMessage(`붙이지 못했습니다. 맞닿는 변은 ${need}cm 이상이어야 하고, 이미 방이 있는 변과는 겹칠 수 없습니다.`)
+      return
+    }
+    writePlan({ ...active, rooms: joined.rooms })
+    setSelectedId(joined.id)
+    setJoinMessage(null)
   }
 
   return (
@@ -149,6 +226,42 @@ export function UnitWorkspace({
             시안 만들기
           </button>
         </div>
+        <Fold title="이어 붙이기">
+          <p className="hint">현관, 복도, 방을 변에 붙입니다. 복도는 여러 개 둘 수 있고, 맞닿는 변은 두 실 중 더 넓은 문 이상이어야 합니다. 복도·방은 90cm, 화장실은 75cm, 거실은 110cm입니다.</p>
+          <div className="generate-row">
+            <button type="button" onClick={startBlank}>현관에서 시작</button>
+            {selected && active && active.rooms.length > 1 && (
+              <button
+                type="button"
+                onClick={() => {
+                  writePlan({ ...active, rooms: shiftToOrigin(active.rooms.filter((room) => room.id !== selected.id)) })
+                  setSelectedId(null)
+                }}
+              >
+                선택 칸 떼기
+              </button>
+            )}
+          </div>
+          <div className="join-kinds">
+            {JOIN_KINDS.map((item) => (
+              <button
+                key={item.kind}
+                type="button"
+                className={joinKind === item.kind ? 'on' : undefined}
+                onClick={() => chooseJoin(item.kind)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          {joinKind && (
+            <div className="fields">
+              <NumberField label="붙는 길이" suffix="cm" value={joinAlong} onChange={setJoinAlong} />
+              <NumberField label="깊이" suffix="cm" value={joinDepth} onChange={setJoinDepth} />
+            </div>
+          )}
+          {joinMessage && <p className="problem">{joinMessage}</p>}
+        </Fold>
         {active && (
           <Fold title="방">
             {active.rooms.map((room) => (
@@ -278,16 +391,18 @@ export function UnitWorkspace({
           <div className="views">
             <UnitScene3D
               plan={active}
-              width={program.width}
-              depth={program.depth}
-              resetKey={`${active.id}-${angleKey}`}
+              width={bounds.width}
+              depth={bounds.depth}
+              resetKey={`${active.id}-${angleKey}-${bounds.width}-${bounds.depth}`}
               onReset={() => setAngleKey((value) => value + 1)}
             />
             <UnitPlan2D
               plan={active}
-              width={program.width}
-              depth={program.depth}
+              width={bounds.width}
+              depth={bounds.depth}
               selectedId={selectedId}
+              joining={joinKind !== null}
+              onJoin={joinOnWall}
               onSelect={(room: UnitRoom) => setSelectedId(room.id)}
               onRename={(roomId, name) => patchRoom(roomId, (room) => ({ ...room, name }))}
               onOpening={(roomId, kind, opening) => {
@@ -310,7 +425,11 @@ export function UnitWorkspace({
             집 크기로 가구 배치
           </button>
         </div>
-        <p className="hint">방 이름은 더블클릭해서 바꿉니다. 문과 창문은 양 끝 점을 끌거나 왼쪽 수치로 바꿉니다. 방을 고르면 그 방으로 넘어가고, 집 크기는 외곽 전체를 하나의 방으로 엽니다.</p>
+        <p className="hint">
+          {joinKind
+            ? '파란 변을 누르면 그 칸에 붙습니다. 문 폭보다 짧게 닿거나 다른 방과 겹치면 붙지 않습니다.'
+            : '방 이름은 더블클릭해서 바꿉니다. 문과 창문은 양 끝 점을 끌거나 왼쪽 수치로 바꿉니다. 방을 고르면 그 방으로 넘어가고, 집 크기는 외곽 전체를 하나의 방으로 엽니다.'}
+        </p>
       </main>
     </div>
   )

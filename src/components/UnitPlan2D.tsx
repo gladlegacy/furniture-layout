@@ -30,6 +30,8 @@ export function UnitPlan2D({
   width,
   depth,
   selectedId,
+  joining = false,
+  onJoin,
   onSelect,
   onRename,
   onOpening,
@@ -38,12 +40,15 @@ export function UnitPlan2D({
   width: number
   depth: number
   selectedId: string | null
+  joining?: boolean
+  onJoin?: (roomId: string, wall: Wall, at: number) => void
   onSelect: (room: UnitRoom) => void
   onRename: (roomId: string, name: string) => void
   onOpening: (roomId: string, kind: OpeningKind, opening: UnitOpening) => void
 }) {
   const dragRef = useRef<Drag | null>(null)
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null)
+  const [hoverWall, setHoverWall] = useState<{ id: string; wall: Wall } | null>(null)
   const padLeft = 128
   const padTop = 72
   const padBottom = 148
@@ -53,6 +58,9 @@ export function UnitPlan2D({
   const viewW = width * scale + padLeft + 28
   const viewH = depth * scale + padTop + padBottom
   const { svgRef, viewBox, zoom, zoomBy } = usePlanZoom(viewW, viewH)
+  const covered = plan.rooms.reduce((sum, room) => sum + room.w * room.d, 0)
+  const filled = Math.abs(covered - width * depth) < 2
+  const band = 18 / scale
   const X = (x: number) => padLeft + x * scale
   const Y = (y: number) => padTop + (depth - y) * scale
 
@@ -94,8 +102,8 @@ export function UnitPlan2D({
           <button type="button" onClick={() => zoomBy(1.25)}>확대</button>
         </span>
       </figcaption>
-      <svg ref={svgRef} viewBox={viewBox} role="img" aria-label="방 배치 평면도">
-        <rect x={X(0)} y={Y(depth)} width={width * scale} height={depth * scale} fill="#f4ecdf" stroke="#1c1c1c" strokeWidth={7} />
+      <svg ref={svgRef} className={joining ? 'editing' : undefined} viewBox={viewBox} role="img" aria-label="방 배치 평면도">
+        <rect x={X(0)} y={Y(depth)} width={width * scale} height={depth * scale} fill={filled ? '#f4ecdf' : '#f7f5f2'} stroke={filled ? '#1c1c1c' : '#c8c2b6'} strokeWidth={filled ? 7 : 1.5} />
         {plan.rooms.map((room) => (
           <g key={room.id} onClick={() => onSelect(room)} style={{ cursor: 'pointer' }}>
             <rect
@@ -144,6 +152,39 @@ export function UnitPlan2D({
                 <tspan x={X(room.x + room.w / 2)} dy="1.25em" className="piece-size">{(room.w * room.d / 10000).toFixed(1)}㎡</tspan>
               </text>
             ) : null}
+            {joining && (['south', 'north', 'west', 'east'] as const).map((wall) => {
+              const horizontal = wall === 'north' || wall === 'south'
+              const x = wall === 'east' ? X(room.x + room.w) - band / 2 : wall === 'west' ? X(room.x) - band / 2 : X(room.x)
+              const y = wall === 'north' ? Y(room.y + room.d) - band / 2 : wall === 'south' ? Y(room.y) - band / 2 : Y(room.y + room.d)
+              const hot = hoverWall?.id === room.id && hoverWall.wall === wall
+              return (
+                <rect
+                  key={wall}
+                  className="join-wall"
+                  x={x}
+                  y={y}
+                  width={horizontal ? room.w * scale : band}
+                  height={horizontal ? band : room.d * scale}
+                  fill={hot ? 'rgba(28, 155, 232, 0.45)' : 'rgba(28, 155, 232, 0.16)'}
+                  stroke="rgba(13, 132, 204, 0.7)"
+                  strokeWidth={1}
+                  onPointerEnter={() => setHoverWall({ id: room.id, wall })}
+                  onPointerLeave={() => setHoverWall((current) => (current?.id === room.id && current.wall === wall ? null : current))}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    const svg = svgRef.current
+                    if (!svg || !onJoin) return
+                    const point = clientToCm(svg, event.clientX, event.clientY, padLeft, padTop, scale, depth)
+                    if (!point) return
+                    const at = horizontal ? point.x - room.x : point.y - room.y
+                    onSelect(room)
+                    onJoin(room.id, wall, at)
+                  }}
+                >
+                  <title>{room.name}의 {wall === 'south' ? '남' : wall === 'north' ? '북' : wall === 'east' ? '동' : '서'}쪽 변에 붙입니다.</title>
+                </rect>
+              )
+            })}
           </g>
         ))}
         {plan.rooms.map((room) => (

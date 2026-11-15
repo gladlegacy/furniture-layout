@@ -1,7 +1,7 @@
 import { beside, blocksWindow, doorQuads, furnitureQuad, isValid, makePlaced } from './geometry.ts'
 import { generateAll, validate } from './generate.ts'
 import { measureRoom } from './dimensions.ts'
-import { generateUnitPlans } from './unitPlan.ts'
+import { attachToWall, blankJoinPlan, generateUnitPlans } from './unitPlan.ts'
 import { largestEmpty } from './openArea.ts'
 import { rectangleOutline } from './polygon.ts'
 import { createSample } from '../sample.ts'
@@ -181,5 +181,19 @@ assert(!triangle.rectangle, '삼각형은 직사각형이 아님')
 const sampleDims = measureRoom(rectangleOutline(400, 350))
 assert(sampleDims.rectangle, '예시 방은 직사각형')
 assert(sampleDims.triangle === null, '직사각형 높이')
+
+const blank = blankJoinPlan()
+assert(blank.rooms.length === 1 && blank.rooms[0]?.kind === 'entrance', '현관만 있는 시작')
+const hall = attachToWall(blank.rooms, 'entrance', 'north', 40, 240, 130, 'corridor')
+assert(hall !== null, '복도를 현관에 붙임')
+const hallAgain = attachToWall(hall!.rooms, hall!.id, 'east', 10, 120, 200, 'corridor')
+assert(hallAgain !== null && hallAgain.rooms.filter((room) => room.kind === 'corridor').length === 2, '복도를 이어서 두 개')
+const roomAdded = attachToWall(hallAgain!.rooms, hall!.id, 'north', 20, 200, 280, 'bedroom')
+assert(roomAdded !== null && roomAdded.rooms.some((room) => room.kind === 'bedroom'), '방을 복도에 붙임')
+assert((roomAdded!.rooms.find((room) => room.kind === 'bedroom')?.door?.width ?? 0) >= 90, '방 문은 90cm 이상')
+assert(attachToWall(roomAdded!.rooms, 'entrance', 'north', 0, 400, 400, 'living') === null, '겹치는 변에는 붙이지 않음')
+assert(attachToWall(blank.rooms, 'entrance', 'north', 0, 70, 200, 'bedroom') === null, '문보다 짧은 변에는 붙이지 않음')
+const shifted = roomAdded!.rooms
+assert(Math.min(...shifted.map((room) => room.x)) === 0 && Math.min(...shifted.map((room) => room.y)) === 0, '붙인 뒤 원점으로 맞춤')
 
 console.log('selfCheck ok')

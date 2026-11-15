@@ -107,11 +107,21 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   font-size: 14px;
 }
 
-.row-actions button.on {
+.row-actions button.on,
+.join-kinds button.on {
   background: var(--blue);
   color: #fff;
   border-color: var(--blue);
 }
+
+.join-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.join-wall { cursor: copy; }
 
 .check {
   flex-direction: row;
