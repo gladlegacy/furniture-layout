@@ -142,6 +142,9 @@ export default function App() {
   return (
     <div className="app">
       <header className="site-nav">
+        {mode && (
+          <button type="button" className="home-back" onClick={() => setMode(null)}>시작 화면</button>
+        )}
         <div className="brand">
           <svg className="brand-mark" viewBox="0 0 28 28" aria-hidden="true">
             <rect x="1.5" y="1.5" width="25" height="25" rx="6" fill="none" stroke="#3a4452" strokeWidth="1.4" />
