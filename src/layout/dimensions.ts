@@ -1,4 +1,8 @@
 import type { Point } from '../types.ts'
+
+export function formatMm(cm: number): string {
+  return `${Math.round(cm * 10)}mm`
+}
 import { boundsOf, edgeTitle, getEdge, signedArea } from './polygon.ts'
 
 export type EdgeMeasure = {

@@ -65,6 +65,29 @@ export function getEdge(outline: Point[], index: number): Edge | null {
   return { index, a, b, dx, dy, length: Math.hypot(dx, dy) }
 }
 
+export function alongEdge(edge: Edge, point: Point): number {
+  if (edge.length < 1e-6) return 0
+  const t = ((point.x - edge.a.x) * edge.dx + (point.y - edge.a.y) * edge.dy) / (edge.length * edge.length)
+  return Math.max(0, Math.min(edge.length, t * edge.length))
+}
+
+export function slideOpening(outline: Point[], width: number, point: Point, grab: number): { edge: number; offset: number } | null {
+  let best: { edge: number; along: number; dist: number } | null = null
+  for (let index = 0; index < outline.length; index++) {
+    const edge = getEdge(outline, index)
+    if (!edge || edge.length < width) continue
+    const along = alongEdge(edge, point)
+    const nearest = pointAt(edge, along)
+    const dist = Math.hypot(nearest.x - point.x, nearest.y - point.y)
+    if (!best || dist < best.dist) best = { edge: index, along, dist }
+  }
+  if (!best) return null
+  const edge = getEdge(outline, best.edge)
+  if (!edge) return null
+  const offset = Math.max(0, Math.min(edge.length - width, best.along - grab))
+  return { edge: best.edge, offset: Math.round(offset) }
+}
+
 export function pointAt(edge: Edge, distance: number): Point {
   if (edge.length < 1e-6) return { x: edge.a.x, y: edge.a.y }
   const t = distance / edge.length

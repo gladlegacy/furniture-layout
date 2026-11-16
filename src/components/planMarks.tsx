@@ -3,13 +3,20 @@ export function WindowStroke({
   b,
   X,
   Y,
+  full = false,
 }: {
   a: { x: number; y: number }
   b: { x: number; y: number }
   X: (value: number) => number
   Y: (value: number) => number
+  full?: boolean
 }) {
-  return <line x1={X(a.x)} y1={Y(a.y)} x2={X(b.x)} y2={Y(b.y)} stroke="#9ec9e2" strokeWidth={11} />
+  return (
+    <g className={full ? 'picture-window' : undefined}>
+      <line x1={X(a.x)} y1={Y(a.y)} x2={X(b.x)} y2={Y(b.y)} stroke="#9ec9e2" strokeWidth={full ? 16 : 11} />
+      {full && <line x1={X(a.x)} y1={Y(a.y)} x2={X(b.x)} y2={Y(b.y)} stroke="#f7fbfe" strokeWidth={4} />}
+    </g>
+  )
 }
 
 export function DoorSwing({

@@ -27,7 +27,7 @@ export function usePlanZoom(viewW: number, viewH: number) {
       if (event.button !== 0 || svg.dataset.pan === 'off') return
       const target = event.target
       if (!(target instanceof Element)) return
-      if (target.closest('.opening-node, .vertex, input, textarea, .plan-name-input')) return
+      if (target.closest('.opening-node, .vertex, input, textarea, .plan-name-input, .room-body, .piece-label, .join-wall, .room-resize, .furniture-body, .plan-opening, .furniture-turn, .room-size, .wall-hit, .wall-menu')) return
       const ctm = svg.getScreenCTM()
       if (!ctm) return
       drag = {

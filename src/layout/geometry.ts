@@ -41,6 +41,62 @@ export function footprint(width: number, depth: number, rot: number): { w: numbe
   return { w: round2(width * c + depth * s), d: round2(width * s + depth * c) }
 }
 
+export function furnitureAnchor(item: Placed, signW: number, signD: number): Point {
+  const rad = (item.rotation * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const lx = signW * item.nominalWidth / 2
+  const lz = signD * item.nominalDepth / 2
+  const cx = item.x + item.w / 2
+  const cy = item.y + item.d / 2
+  return {
+    x: cx + lx * cos + lz * sin,
+    y: cy - lx * sin + lz * cos,
+  }
+}
+
+export function resizePlaced(item: Placed, anchor: Point, signW: number, signD: number, pointer: Point): Placed {
+  const rad = (item.rotation * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const dx = pointer.x - anchor.x
+  const dy = pointer.y - anchor.y
+  const alongW = dx * cos - dy * sin
+  const alongD = dx * sin + dy * cos
+  const min = 20
+  const width = signW === 0 ? item.nominalWidth : Math.max(min, Math.round(alongW * signW))
+  const depth = signD === 0 ? item.nominalDepth : Math.max(min, Math.round(alongD * signD))
+  const oppLx = -signW * width / 2
+  const oppLz = -signD * depth / 2
+  const cx = anchor.x - oppLx * cos - oppLz * sin
+  const cy = anchor.y + oppLx * sin - oppLz * cos
+  const size = footprint(width, depth, item.rotation)
+  return {
+    ...item,
+    nominalWidth: width,
+    nominalDepth: depth,
+    w: size.w,
+    d: size.d,
+    x: round2(cx - size.w / 2),
+    y: round2(cy - size.d / 2),
+  }
+}
+
+export function turnPlaced(placed: Placed, degrees = 90): Placed {
+  const rotation = normRotation(placed.rotation + degrees)
+  const size = footprint(placed.nominalWidth, placed.nominalDepth, rotation)
+  const cx = placed.x + placed.w / 2
+  const cy = placed.y + placed.d / 2
+  return {
+    ...placed,
+    rotation,
+    w: size.w,
+    d: size.d,
+    x: round2(cx - size.w / 2),
+    y: round2(cy - size.d / 2),
+  }
+}
+
 export function makePlaced(item: Furniture, x: number, y: number, rot: number): Placed {
   const rotation = normRotation(rot)
   const size = footprint(item.width, item.depth, rotation)

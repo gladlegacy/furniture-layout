@@ -12,6 +12,11 @@ export type FurnitureType =
   | 'bookshelf'
   | 'dresser'
   | 'nightstand'
+  | 'shower'
+  | 'bathtub'
+  | 'sink'
+  | 'toilet'
+  | 'shoeCabinet'
 
 export type GoalId = 'sleep' | 'study' | 'living' | 'storage' | 'open'
 
@@ -83,6 +88,11 @@ export const FURNITURE_LABEL: Record<FurnitureType, string> = {
   bookshelf: '책장',
   dresser: '서랍장',
   nightstand: '협탁',
+  shower: '샤워기',
+  bathtub: '욕조',
+  sink: '세면대',
+  toilet: '변기',
+  shoeCabinet: '신발장',
 }
 
 export const FURNITURE_SUBJECT: Record<FurnitureType, string> = {
@@ -95,6 +105,11 @@ export const FURNITURE_SUBJECT: Record<FurnitureType, string> = {
   bookshelf: '책장이',
   dresser: '서랍장이',
   nightstand: '협탁이',
+  shower: '샤워기가',
+  bathtub: '욕조가',
+  sink: '세면대가',
+  toilet: '변기가',
+  shoeCabinet: '신발장이',
 }
 
 export const FURNITURE_OBJECT: Record<FurnitureType, string> = {
@@ -107,6 +122,11 @@ export const FURNITURE_OBJECT: Record<FurnitureType, string> = {
   bookshelf: '책장을',
   dresser: '서랍장을',
   nightstand: '협탁을',
+  shower: '샤워기를',
+  bathtub: '욕조를',
+  sink: '세면대를',
+  toilet: '변기를',
+  shoeCabinet: '신발장을',
 }
 
 export const GOAL_LABEL: Record<GoalId, string> = {
@@ -134,6 +154,11 @@ export const FURNITURE_TYPES: FurnitureType[] = [
   'bookshelf',
   'dresser',
   'nightstand',
+  'shower',
+  'bathtub',
+  'sink',
+  'toilet',
+  'shoeCabinet',
 ]
 
 export const DEFAULT_SIZE: Record<FurnitureType, Pick<Furniture, 'width' | 'depth' | 'height'>> = {
@@ -146,6 +171,11 @@ export const DEFAULT_SIZE: Record<FurnitureType, Pick<Furniture, 'width' | 'dept
   bookshelf: { width: 80, depth: 35, height: 180 },
   dresser: { width: 80, depth: 45, height: 80 },
   nightstand: { width: 40, depth: 40, height: 50 },
+  shower: { width: 90, depth: 90, height: 200 },
+  bathtub: { width: 160, depth: 75, height: 55 },
+  sink: { width: 60, depth: 45, height: 85 },
+  toilet: { width: 40, depth: 70, height: 78 },
+  shoeCabinet: { width: 100, depth: 35, height: 110 },
 }
 
 export const WALLS: Wall[] = ['north', 'south', 'east', 'west']

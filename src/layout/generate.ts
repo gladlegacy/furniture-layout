@@ -1,4 +1,5 @@
 import type { Furniture, FurnitureType, GoalId, LayoutResult, Opening, Placed, Scene } from '../types.ts'
+import { formatMm } from './dimensions.ts'
 import { FURNITURE_LABEL, FURNITURE_OBJECT, FURNITURE_SUBJECT, GOALS, ROTATIONS } from '../types.ts'
 import {
   backEdge,
@@ -34,7 +35,7 @@ type Step =
 
 type Expansion = { options: Option[]; deferred: Furniture[] }
 
-const STORAGE = new Set<FurnitureType>(['wardrobe', 'bookshelf', 'dresser'])
+const STORAGE = new Set<FurnitureType>(['wardrobe', 'bookshelf', 'dresser', 'shoeCabinet'])
 
 function isStorage(type: FurnitureType): boolean {
   return STORAGE.has(type)
@@ -55,11 +56,11 @@ export function validate(scene: Scene): string | null {
   }
   const box = boundsOf(outline)
   if (![box.width, box.depth, room.height].every((value) => Number.isFinite(value) && value >= 100 && value <= 2000)) {
-    return '방의 가로, 세로, 층고는 100cm 이상 2000cm 이하여야 합니다.'
+    return '방의 가로, 세로, 층고는 1000mm 이상 20000mm 이하여야 합니다.'
   }
   for (let index = 0; index < outline.length; index++) {
     const edge = getEdge(outline, index)
-    if (!edge || edge.length < 40) return '방 모양의 각 변은 40cm 이상이어야 합니다.'
+    if (!edge || edge.length < 40) return '방 모양의 각 변은 400mm 이상이어야 합니다.'
   }
   if (selfIntersects(outline)) return '방 모양이 서로 교차합니다.'
   if (Math.abs(signedArea(outline)) < 500) return '방 넓이가 너무 작습니다.'
@@ -155,7 +156,7 @@ function buildSteps(goal: GoalId, furniture: Furniture[]): Step[] {
   }
   const pullStorage = () => {
     const steps: Array<{ kind: 'single'; item: Furniture }> = []
-    for (const type of ['wardrobe', 'bookshelf', 'dresser'] as const) {
+    for (const type of ['wardrobe', 'bookshelf', 'dresser', 'shoeCabinet'] as const) {
       for (const item of takeAll(pool, type)) steps.push({ kind: 'single', item })
     }
     return steps
@@ -421,7 +422,7 @@ function describe(goal: GoalId, placed: Placed[], scene: Scene, areaM2: number):
     const head = edge !== null
       ? `침대 머리맡이 ${edgeTitle(room.outline, edge)} 벽에 닿아 있습니다.`
       : '침대를 방 안에 두었습니다.'
-    const doorText = doors.length > 0 ? ` 문과는 약 ${distance}cm 떨어져 있습니다.` : ''
+    const doorText = doors.length > 0 ? ` 문과는 약 ${formatMm(distance)} 떨어져 있습니다.` : ''
     const side = nightstand ? ' 협탁은 침대 옆에 있습니다.' : ''
     return `${head}${doorText}${side}`
   }
@@ -434,7 +435,7 @@ function describe(goal: GoalId, placed: Placed[], scene: Scene, areaM2: number):
     const windowText =
       windows.length === 0
         ? '창문이 없어 책상을 벽에 붙여 두었습니다.'
-        : `책상을 창문에서 약 ${distance}cm 위치에 두었습니다.`
+        : `책상을 창문에서 약 ${formatMm(distance)} 위치에 두었습니다.`
     if (!wantedChair) return windowText
     const chairOk = chair ? beside(chair, desk, 30) : false
     return chairOk ? `${windowText} 의자 공간을 책상 앞에 두었습니다.` : `${windowText} 의자 자리를 확보하지 못했습니다.`

@@ -7,13 +7,21 @@ import {
   FURNITURE_TYPES,
   uid,
 } from '../types.ts'
-import { measureRoom } from '../layout/dimensions.ts'
+import { formatMm, measureRoom } from '../layout/dimensions.ts'
 import { edgeTitle, getEdge } from '../layout/polygon.ts'
 import { resizeRoom } from '../layout/shapeEdit.ts'
 import type { ShapeTool } from './FloorPlan2D.tsx'
 import { Fold } from './Fold.tsx'
 import { InventoryPanel } from './InventoryPanel.tsx'
 import { NumberField } from './NumberField.tsx'
+
+function toMm(cm: number): number {
+  return Math.round(cm * 10)
+}
+
+function toCm(mm: number): number {
+  return mm / 10
+}
 
 type EditorProps = {
   scene: Scene
@@ -25,8 +33,11 @@ type EditorProps = {
   onGenerate: () => void
   onReset: () => void
   entries: StoredEntry[]
+  layouts?: { id: string; label: string; detail: string; note: string; selected: boolean }[]
+  onSelectLayout?: (id: string) => void
   onSaveInventory: (name: string) => void
   onLoadInventory: (entry: StoredEntry) => void
+  onRenameInventory: (id: string, name: string) => void
   onDeleteInventory: (id: string) => void
 }
 
@@ -40,8 +51,11 @@ export function Editor({
   onGenerate,
   onReset,
   entries,
+  layouts,
+  onSelectLayout,
   onSaveInventory,
   onLoadInventory,
+  onRenameInventory,
   onDeleteInventory,
 }: EditorProps) {
   const [addType, setAddType] = useState<FurnitureType>('bed')
@@ -78,37 +92,37 @@ export function Editor({
   const toggle = (next: ShapeTool) => onTool(tool === next ? null : next)
 
   return (
-    <aside className="editor">
+    <aside className="editor compact">
       <Fold title="방 모양">
         <p className="hint">변 길이는 평면도 바깥에 두고, 꺾인 꼭짓점에는 각도를 표시합니다. 방 크기는 레퍼런스에서 가져온 집이나 방도 가로와 세로로 바꿉니다.</p>
         <div className="fields">
-          <NumberField label="방 가로" suffix="cm" value={Math.round(dims.width)} onChange={(width) => onChange(resizeRoom(scene, width, dims.depth))} />
-          <NumberField label="방 세로" suffix="cm" value={Math.round(dims.depth)} onChange={(depth) => onChange(resizeRoom(scene, dims.width, depth))} />
+          <NumberField label="방 가로" suffix="mm" value={toMm(dims.width)} onChange={(width) => onChange(resizeRoom(scene, toCm(width), dims.depth))} />
+          <NumberField label="방 세로" suffix="mm" value={toMm(dims.depth)} onChange={(depth) => onChange(resizeRoom(scene, dims.width, toCm(depth)))} />
         </div>
         <div className="row-actions">
           <button type="button" className={tool === 'add' ? 'on' : undefined} onClick={() => toggle('add')}>점 추가</button>
           <button type="button" className={tool === 'move' ? 'on' : undefined} onClick={() => toggle('move')}>점 이동</button>
           <button type="button" className={tool === 'delete' ? 'on' : undefined} onClick={() => toggle('delete')}>점 삭제</button>
         </div>
-        <NumberField label="층고" suffix="cm" value={scene.room.height} onChange={(height) => onChange({ ...scene, room: { ...scene.room, height } })} />
+        <NumberField label="층고" suffix="mm" value={toMm(scene.room.height)} onChange={(height) => onChange({ ...scene, room: { ...scene.room, height: toCm(height) } })} />
         {scene.room.outline.map((point, index) => (
           <div key={`vertex-${index}`} className="fields">
-            <NumberField label={`점 ${index + 1} 가로`} suffix="cm" value={point.x} onChange={(x) => moveVertex(index, { x, y: point.y })} />
-            <NumberField label={`점 ${index + 1} 세로`} suffix="cm" value={point.y} onChange={(y) => moveVertex(index, { x: point.x, y })} />
+            <NumberField label={`점 ${index + 1} 가로`} suffix="mm" value={toMm(point.x)} onChange={(x) => moveVertex(index, { x: toCm(x), y: point.y })} />
+            <NumberField label={`점 ${index + 1} 세로`} suffix="mm" value={toMm(point.y)} onChange={(y) => moveVertex(index, { x: point.x, y: toCm(y) })} />
           </div>
         ))}
         <ul className="dim-list">
-          <li>면적 {(dims.area / 10000).toFixed(1)}㎡ · 전체 가로 {Math.round(dims.width)}cm · 세로 {Math.round(dims.depth)}cm</li>
+          <li>면적 {(dims.area / 10000).toFixed(1)}㎡ · 전체 가로 {formatMm(dims.width)} · 세로 {formatMm(dims.depth)}</li>
           {dims.edges.map((edge) => (
-            <li key={edge.index}>변 {edge.index + 1} {edge.title} {Math.round(edge.length)}cm</li>
+            <li key={edge.index}>변 {edge.index + 1} {edge.title} {formatMm(edge.length)}</li>
           ))}
           {dims.corners.filter((corner) => corner.bent).map((corner) => (
             <li key={`corner-${corner.index}`}>
-              점 {corner.index + 1} 각도 {Math.round(corner.angle)}° · 점까지 {Math.round(corner.lengthToPoint)}cm
+              점 {corner.index + 1} 각도 {Math.round(corner.angle)}° · 점까지 {formatMm(corner.lengthToPoint)}
             </li>
           ))}
           {dims.triangle && (
-            <li>삼각형 높이 {Math.round(dims.triangle.height)}cm · 밑변 {Math.round(dims.triangle.base)}cm</li>
+            <li>삼각형 높이 {formatMm(dims.triangle.height)} · 밑변 {formatMm(dims.triangle.base)}</li>
           )}
         </ul>
       </Fold>
@@ -134,19 +148,19 @@ export function Editor({
                   const edge = getEdge(scene.room.outline, index)
                   return (
                     <option key={index} value={index}>
-                      변 {index + 1} · {edgeTitle(scene.room.outline, index)} · {Math.round(edge?.length ?? 0)}cm
+                      변 {index + 1} · {edgeTitle(scene.room.outline, index)} · {formatMm(edge?.length ?? 0)}
                     </option>
                   )
                 })}
               </select>
             </label>
             <div className="fields">
-              <NumberField label="시작 거리" suffix="cm" value={opening.offset} onChange={(offset) => patchOpening(opening.id, { offset })} />
-              <NumberField label="폭" suffix="cm" value={opening.width} onChange={(width) => patchOpening(opening.id, { width })} />
+              <NumberField label="시작 거리" suffix="mm" value={toMm(opening.offset)} onChange={(offset) => patchOpening(opening.id, { offset: toCm(offset) })} />
+              <NumberField label="폭" suffix="mm" value={toMm(opening.width)} onChange={(width) => patchOpening(opening.id, { width: toCm(width) })} />
               {opening.kind === 'window' && (
                 <>
-                  <NumberField label="창대" suffix="cm" value={opening.sill} onChange={(sill) => patchOpening(opening.id, { sill })} />
-                  <NumberField label="창문 높이" suffix="cm" value={opening.height} onChange={(height) => patchOpening(opening.id, { height })} />
+                  <NumberField label="창대" suffix="mm" value={toMm(opening.sill)} onChange={(sill) => patchOpening(opening.id, { sill: toCm(sill) })} />
+                  <NumberField label="창문 높이" suffix="mm" value={toMm(opening.height)} onChange={(height) => patchOpening(opening.id, { height: toCm(height) })} />
                 </>
               )}
             </div>
@@ -175,32 +189,32 @@ export function Editor({
                 삭제
               </button>
             </header>
-            <div className="fields">
+            <div className="fields three">
               <NumberField
                 label="가로"
-                suffix="cm"
-                value={item.width}
+                suffix="mm"
+                value={toMm(item.width)}
                 onChange={(width) => onChange({
                   ...scene,
-                  furniture: scene.furniture.map((entry) => (entry.id === item.id ? { ...entry, width } : entry)),
+                  furniture: scene.furniture.map((entry) => (entry.id === item.id ? { ...entry, width: toCm(width) } : entry)),
                 })}
               />
               <NumberField
                 label="세로"
-                suffix="cm"
-                value={item.depth}
+                suffix="mm"
+                value={toMm(item.depth)}
                 onChange={(depth) => onChange({
                   ...scene,
-                  furniture: scene.furniture.map((entry) => (entry.id === item.id ? { ...entry, depth } : entry)),
+                  furniture: scene.furniture.map((entry) => (entry.id === item.id ? { ...entry, depth: toCm(depth) } : entry)),
                 })}
               />
               <NumberField
                 label="높이"
-                suffix="cm"
-                value={item.height}
+                suffix="mm"
+                value={toMm(item.height)}
                 onChange={(height) => onChange({
                   ...scene,
-                  furniture: scene.furniture.map((entry) => (entry.id === item.id ? { ...entry, height } : entry)),
+                  furniture: scene.furniture.map((entry) => (entry.id === item.id ? { ...entry, height: toCm(height) } : entry)),
                 })}
               />
             </div>
@@ -216,8 +230,11 @@ export function Editor({
       </div>
       <InventoryPanel
         entries={entries.filter((entry) => entry.kind === 'furniture')}
+        layouts={layouts}
+        onSelectLayout={onSelectLayout}
         onSave={onSaveInventory}
         onLoad={onLoadInventory}
+        onRename={onRenameInventory}
         onDelete={onDeleteInventory}
       />
     </aside>

@@ -1,4 +1,5 @@
 import type { GoalId, LayoutResult, Scene } from './types.ts'
+import type { LayoutChoice, RoomFocus } from './layout/roomLayouts.ts'
 import type { UnitPlan, UnitProgram } from './layout/unitPlan.ts'
 
 const KEY = 'furniture-layout.inventory'
@@ -12,6 +13,9 @@ export type FurnitureRecord = {
   scene: Scene
   goal: GoalId
   results: LayoutResult[]
+  focus?: RoomFocus
+  layoutId?: string
+  picks?: { id: string; label: string; goal: GoalId; types: LayoutChoice['types']; result: LayoutResult }[]
 }
 
 export type UnitRecord = {
@@ -51,4 +55,10 @@ export function addInventory(entries: InventoryEntry[], entry: InventoryEntry): 
   return [entry, ...entries.filter((item) => item.id !== entry.id)]
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, MAX)
+}
+
+export function renameInventory(entries: InventoryEntry[], id: string, name: string): InventoryEntry[] {
+  const next = name.trim()
+  if (!next) return entries
+  return entries.map((entry) => (entry.id === id ? { ...entry, name: next } : entry))
 }
